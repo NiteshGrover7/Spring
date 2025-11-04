@@ -1,0 +1,23 @@
+Objective:
+To develop a Hibernate application that performs CRUD operations on a Student entity stored in a MySQL database using Hibernate ORM.
+
+Explanation:
+This task introduces Object Relational Mapping using Hibernate:
+
+Define a Student class annotated with Hibernate/JPA annotations (@Entity, @Id, @Column).
+
+Configure Hibernate using a hibernate.cfg.xml file or Java-based config.
+
+Create operations:
+
+Create: Add a new student.
+Read: Fetch and display student(s).
+Update: Modify student details.
+Delete: Remove a student by ID.
+Use SessionFactory and Session from Hibernate to manage database interactions.
+
+This helps you understand:
+
+Hibernate mapping and configuration.
+Managing entities and sessions.
+Performing database operations using Hibernate.
