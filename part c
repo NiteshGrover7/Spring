@@ -1,0 +1,172 @@
+// File: BankingSystem.java
+package com.example.banking;
+
+import org.springframework.context.annotation.*;
+import org.springframework.transaction.annotation.*;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.orm.hibernate5.HibernateTransactionManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
+
+import javax.persistence.*;
+import java.util.*;
+
+// ------------------------------------------------------
+// 1️⃣ ENTITY CLASSES
+// ------------------------------------------------------
+
+@Entity
+@Table(name = "accounts")
+class Account {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+
+    private String name;
+    private double balance;
+
+    public Account() {}
+
+    public Account(String name, double balance) {
+        this.name = name;
+        this.balance = balance;
+    }
+
+    // Getters and Setters
+    public int getId() { return id; }
+    public String getName() { return name; }
+    public double getBalance() { return balance; }
+    public void setBalance(double balance) { this.balance = balance; }
+}
+
+@Entity
+@Table(name = "transactions")
+class TransactionRecord {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+
+    private int fromAccountId;
+    private int toAccountId;
+    private double amount;
+    private Date date;
+
+    public TransactionRecord() {}
+
+    public TransactionRecord(int fromAccountId, int toAccountId, double amount) {
+        this.fromAccountId = fromAccountId;
+        this.toAccountId = toAccountId;
+        this.amount = amount;
+        this.date = new Date();
+    }
+}
+
+// ------------------------------------------------------
+// 2️⃣ DAO LAYER (Data Access Layer)
+// ------------------------------------------------------
+@Repository
+class AccountDAO {
+
+    @Autowired
+    private SessionFactory sessionFactory;
+
+    public Account getAccount(int id) {
+        return sessionFactory.getCurrentSession().get(Account.class, id);
+    }
+
+    public void updateAccount(Account account) {
+        sessionFactory.getCurrentSession().update(account);
+    }
+
+    public void saveTransaction(TransactionRecord txn) {
+        sessionFactory.getCurrentSession().save(txn);
+    }
+}
+
+// ------------------------------------------------------
+// 3️⃣ SERVICE LAYER (Business Logic + Transactions)
+// ------------------------------------------------------
+@Service
+class BankingService {
+
+    @Autowired
+    private AccountDAO accountDAO;
+
+    @Transactional
+    public void transferMoney(int fromId, int toId, double amount) {
+        Account fromAcc = accountDAO.getAccount(fromId);
+        Account toAcc = accountDAO.getAccount(toId);
+
+        if (fromAcc == null || toAcc == null)
+            throw new RuntimeException("Account not found!");
+
+        if (fromAcc.getBalance() < amount)
+            throw new RuntimeException("Insufficient balance!");
+
+        // Deduct from sender
+        fromAcc.setBalance(fromAcc.getBalance() - amount);
+        accountDAO.updateAccount(fromAcc);
+
+        // Artificial failure simulation (uncomment to test rollback)
+        // if(true) throw new RuntimeException("Simulated Failure!");
+
+        // Add to receiver
+        toAcc.setBalance(toAcc.getBalance() + amount);
+        accountDAO.updateAccount(toAcc);
+
+        // Record transaction
+        TransactionRecord txn = new TransactionRecord(fromId, toId, amount);
+        accountDAO.saveTransaction(txn);
+
+        System.out.println("Transaction successful! " + amount + " transferred.");
+    }
+}
+
+// ------------------------------------------------------
+// 4️⃣ SPRING CONFIGURATION CLASS
+// ------------------------------------------------------
+@Configuration
+@EnableTransactionManagement
+@ComponentScan(basePackages = "com.example.banking")
+class AppConfig {
+
+    @Bean
+    public SessionFactory sessionFactory() {
+        // Hibernate configuration setup
+        return new Configuration()
+                .configure("hibernate.cfg.xml") // must exist in resources
+                .addAnnotatedClass(Account.class)
+                .addAnnotatedClass(TransactionRecord.class)
+                .buildSessionFactory();
+    }
+
+    @Bean
+    public PlatformTransactionManager transactionManager(SessionFactory sessionFactory) {
+        return new HibernateTransactionManager(sessionFactory);
+    }
+}
+
+// ------------------------------------------------------
+// 5️⃣ MAIN APPLICATION
+// ------------------------------------------------------
+public class BankingSystem {
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+
+        BankingService service = context.getBean(BankingService.class);
+
+        try {
+            // Perform money transfer
+            service.transferMoney(1, 2, 5000);
+        } catch (Exception e) {
+            System.out.println("Transaction failed: " + e.getMessage());
+        }
+
+        context.close();
+    }
+}
